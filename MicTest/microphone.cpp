@@ -17,6 +17,13 @@ Microphone::Microphone()
 	waveFormat.nAvgBytesPerSec = waveFormat.nSamplesPerSec * waveFormat.nBlockAlign;
 	waveFormat.cbSize = 0;
 
+
+	playHeader.lpData = (LPSTR)malloc(BUFFER_SIZE * sizeof(char));
+	playHeader.dwBufferLength = BUFFER_SIZE;
+	playHeader.dwUser = 0;
+	playHeader.dwFlags = NULL;
+	playHeader.dwLoops = 0;
+
 	for (int i = 0; i < 2; i++)
 	{
 		waveHeader[i].lpData = buffer[i];
@@ -49,6 +56,7 @@ bool Microphone::GetNumMicrophones(unsigned int* numMics)
 	}
 	devices.resize(micCount);
 	*numMics = micCount;
+	return true;
 }
 
 bool Microphone::GetAttatchedMicrophones(char** micArray)
@@ -91,7 +99,7 @@ bool Microphone::SelectMicrophone(unsigned int mic)
 
 	for (int i = 0; i < 2; i++)
 	{
-		mmres = waveInPrepareHeader(waveHandle, &waveHeader[i], sizeof(waveHeader));
+		mmres = waveInPrepareHeader(waveHandle, &waveHeader[i], sizeof(waveHeader[i]));
 		if (mmres != MMSYSERR_NOERROR)
 		{
 			mmResult = mmres;
@@ -106,13 +114,29 @@ bool Microphone::SelectMicrophone(unsigned int mic)
 			error = WAVE_IN_MMRESULT;
 			return false;
 		}
-	}
 
+		//mmres = waveInPrepareHeader(waveHandle, &playHeader[i], sizeof(playHeader[i]));
+		//if (mmres != MMSYSERR_NOERROR)
+		//{
+		//	mmResult = mmres;
+		//	error = WAVE_IN_MMRESULT;
+		//	return false;
+		//}
+	}
+	mmres = waveInPrepareHeader(waveHandle, &playHeader, sizeof(playHeader));
+	if (mmres != MMSYSERR_NOERROR)
+	{
+		mmResult = mmres;
+		error = WAVE_IN_MMRESULT;
+		return false;
+	}
+	playHeader.dwFlags |= WHDR_DONE;
+	recording = false;
 	selectedDevice = mic;
 	return true;
 }
 
-bool Microphone::Stream(char** returnData, unsigned int* len)
+bool Microphone::Stream(char** returnData, unsigned int* len, int* flags)
 {
 	if (!recording)
 	{
@@ -133,14 +157,14 @@ bool Microphone::Stream(char** returnData, unsigned int* len)
 	{
 		if (waveHeader[i].dwFlags & WHDR_DONE)
 		{
-			waveOutWrite(speakerHandle[0], &waveHeader[0], sizeof(waveHeader[0]));
 			len[i] = waveHeader[i].dwBytesRecorded;
-			memcpy(returnData[i], waveHeader[i].lpData, waveHeader[i].dwBytesRecorded);
+			flags[i] = waveHeader[i].dwFlags;
+			memcpy(returnData[i], waveHeader[i].lpData, BUFFER_SIZE);
+			//waveOutWrite(speakerHandle[0], &waveHeader[0], sizeof(waveHeader[0]));
 			waveHeader[i].dwBytesRecorded = 0;
 			waveHeader[i].dwFlags = 0;
 			waveInPrepareHeader(waveHandle, &waveHeader[i], sizeof(waveHeader[i]));
 			waveInAddBuffer(waveHandle, &waveHeader[i], sizeof(waveHeader[i]));
-
 		}
 	}
 	return true;
@@ -157,13 +181,26 @@ void Microphone::GetErrorString(char* errorMsg, unsigned int maxLen)
 	{
 		waveInGetErrorText(mmResult, errorMsg, maxLen);
 	}
+	else if (error == STREAM_RECORDING_STARTED)
+	{
+		memcpy(errorMsg, "Recording started.", 19);
+	}
+	else if (error = INVALID_MIC_SELECTION)
+	{
+		memcpy(errorMsg, "Invalid microphone selected.", 29);
+	}
 	else
 	{
-		memcpy(errorMsg, "UNIMPLEMENTED\0", 14);
+		memcpy(errorMsg, "UNIMPLEMENTED", 14);
 	}
 }
 
-void Microphone::PlayRecording(char* sound)
+void Microphone::PlayRecording(char* sound, int length, int flags)
 {
-
+	if (playHeader.dwFlags & WHDR_DONE)
+	{
+		playHeader.dwBytesRecorded = length;
+		memcpy(playHeader.lpData, sound, BUFFER_SIZE);
+		waveOutWrite(speakerHandle[0], &playHeader, sizeof(playHeader));
+	}
 }

@@ -15,9 +15,7 @@ void main()
 	mic.GetAttatchedMicrophones(micArray);
 
 	for (int i = 0; i < numMics; i++)
-		printf(micArray[i]);
-
-
+		printf("%s\n",micArray[i]);
 
 	if (!mic.SelectMicrophone(0))
 	{
@@ -31,10 +29,11 @@ void main()
 		audioData[i] = (char*)malloc(sizeof(char) * BUFFER_SIZE);
 
 	unsigned int len[2];
+	int flags[2] = { 0, 0 };
 
 	while (true)
 	{
-		if (!mic.Stream(audioData, len))
+		if (!mic.Stream(audioData, len, flags))
 		{
 			char error[512];
 			mic.GetErrorString(error, 512);
@@ -42,10 +41,8 @@ void main()
 		}
 		else
 		{
-			printf("\n\nSEG1\n\n");
-			//printf(audioData[0]);
-			//printf("\n\nSEG2\n\n");
-			//printf(audioData[1]);
+			if (flags[0] & WHDR_DONE)
+				mic.PlayRecording(audioData[0], len[0], flags[0]);
 		}
 	}
 }

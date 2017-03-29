@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <mmsystem.h>
 #include <vector>
+#include <queue>
 
 //half a second of buffer
 #define BUFFER_SIZE 8000 * 2 * 2 / 4
@@ -33,10 +34,12 @@ public:
 		
 	//@param1 : char* data - char pointer to location of the audio buffer
 	//@param2 : unsigned int* len - length of recorded audio, overwritten on call
-	bool Stream(char** returnData, unsigned int* len);
+	//@param3 : int* flags - flags of the waveheader the data is from
+	bool Stream(char** returnData, unsigned int* len, int* flags);
 
-
-	void PlayRecording(char* sound);
+	//@param1 : char* sound - returnData from Stream()
+	//@param2 : int length - len from Stream()
+	void PlayRecording(char* sound, int length, int flags);
 
 	enum MICERROR
 	{
@@ -49,6 +52,7 @@ private:
 	HWAVEIN waveHandle;
 	WAVEFORMATEX waveFormat;
 	WAVEHDR waveHeader[2];
+	WAVEHDR playHeader;
 	MMRESULT mmResult;
 	HWAVEOUT speakerHandle[2];
 	unsigned int selectedDevice;
